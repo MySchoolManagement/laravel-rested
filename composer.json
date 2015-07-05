@@ -1,0 +1,15 @@
+{
+    "name": "myschoolmanagement/laravel-rested",
+    "description": "Laravel integration for myschoolmanagement/rested",
+    "keywords": ["laravel", "rest"],
+    "require": {
+        "php": ">=5.5.9",
+        "ext-curl": "*",
+        "illuminate/support": "5.*",
+        "myschoolmanagement/rested": "dev-master"
+    },
+    "autoload": {
+        "psr-4": { "Rested\\Laravel\\": "src" }
+    },
+    "minimum-stability": "dev"
+}
