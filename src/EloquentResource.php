@@ -4,8 +4,10 @@ namespace Rested\Laravel;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
-use Rested\AbstractResource;
+use Rested\FactoryInterface;
+use Rested\RestedResource;
 use Rested\Response;
+use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
@@ -20,9 +22,11 @@ abstract class EloquentResource extends AbstractResource
      */
     protected $databaseManager;
 
-    public function __construct(AuthorizationCheckerInterface $authorizationChecker = null, Router $router = null, DatabaseManager $databaseManager = null)
+    public function __construct(FactoryInterface $factory, UrlGeneratorInterface $urlGenerator = null,
+        AuthorizationCheckerInterface $authorizationChecker = null, Router $router = null,
+        DatabaseManager $databaseManager = null)
     {
-        parent::__construct($authorizationChecker, $router);
+        parent::__construct($factory, $urlGenerator, $authorizationChecker, $router);
 
         $this->databaseManager = $databaseManager;
     }
