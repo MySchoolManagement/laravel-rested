@@ -86,7 +86,7 @@ abstract class EloquentResource extends AbstractResource
 
         // build total
         $total = $this->createQueryBuilder(true, false)->count();
-        $item = Response::createCollection($this, $items, $total);
+        $item = $this->getFactory()->createCollectionResponse($this, $items, $total);
 
         return $this->done($item);
     }

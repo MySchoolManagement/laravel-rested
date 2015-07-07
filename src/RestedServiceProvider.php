@@ -112,8 +112,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
             return new UrlGenerator($app['url']);
         });
 
-        $app->bindShared('Rested\FactoryInterface', function() use ($self) {
-            return new Factory($self);
+        $app->bindShared('Rested\FactoryInterface', function($app) use ($self) {
+            return new Factory($app['Rested\UrlGeneratorInterface'], $self);
         });
         $app->alias('Rested\FactoryInterface', 'rested.factory');
 
