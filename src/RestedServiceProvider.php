@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
+use Nocarrier\Hal;
 use Ramsey\Uuid\Uuid;
 use Rested\Definition\Parameter;
 use Rested\Helper;
@@ -44,17 +45,20 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $this->registerRoutes();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function execute($url, $method = 'get', $data = [], &$statusCode = null)
     {
         $parentRequest = $this->app['router']->getCurrentRequest();
 
         if (mb_substr($url, 0, 4) === 'http') {
-            $response = $this->performRemoteRequest($parentRequest, $url, $method, $data);
+            $response = $this->performRemoteRequest($parentRequest, $url, $method, $data, $statusCode);
         } else {
-            $response = $this->performLocalRequest($parentRequest, $url, $method, $data);
+            $response = $this->performLocalRequest($parentRequest, $url, $method, $data, $statusCode);
         }
 
-        return json_decode($response);
+        return Hal::fromJson($response, 1);
     }
 
     public function getPrefix()
@@ -62,7 +66,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         return config('rested.prefix');
     }
 
-    private function performLocalRequest(Request $parentRequest = null, $url, $method, $data)
+    private function performLocalRequest(Request $parentRequest = null, $url, $method, $data, &$statusCode = null)
     {
         $urlInfo = parse_url($url);
 
@@ -73,7 +77,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         // create the request object
         $cookies = $parentRequest ? $parentRequest->cookies->all() : [];
         $server = $parentRequest ? $parentRequest->server->all() : [];
-        $request = Request::createFromBase(SymfonyRequest::create($url, $method, $data, $cookies, [], $server, http_build_query($data)));
+        $request = Request::createFromBase(SymfonyRequest::create($url, $method, [], $cookies, [], $server, json_encode($data)));
+        $request->headers->set('Content-Type', 'application/json');
 
         if ($parentRequest !== null) {
             $locale = $parentRequest->getLocale();
@@ -91,10 +96,10 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $response = $kernel->handle(
             $request = $request, HttpKernelInterface::SUB_REQUEST
         );
+        $statusCode = $response->getStatusCode();
+        $content = $response->getContent();
 
-
-
-        return $response->getContent();
+        return $content;
     }
 
     /**

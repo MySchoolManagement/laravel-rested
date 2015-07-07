@@ -2,7 +2,6 @@
 namespace Rested\Laravel;
 
 use Illuminate\Database\DatabaseManager;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Rested\FactoryInterface;
 use Rested\RestedResource;
@@ -10,6 +9,7 @@ use Rested\Response;
 use Rested\Security\AccessVoter;
 use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
@@ -72,7 +72,7 @@ abstract class EloquentResource extends AbstractResource
         return $queryBuilder;
     }
 
-    public function collection(Request $request)
+    public function collection()
     {
         $items = [];
 
@@ -90,13 +90,14 @@ abstract class EloquentResource extends AbstractResource
         return $this->done($item);
     }
 
-    public function create(Request $request)
+    public function create()
     {
-        $data = $request->json()->all();
+        $request = $this->getRouter()->getCurrentRequest();
+        $data = $this->extractDataFromRequest($request);
 
         // check for a duplicate record
         if ($this->hasDuplicate($request, $data) == true) {
-            return $this->abort(HttpResponse::HTTP_CONFLICT, ['An item with this name already exists']);
+            return $this->abort(HttpResponse::HTTP_CONFLICT, ['An item already exists']);
         }
 
         $instance = null;
@@ -167,7 +168,7 @@ abstract class EloquentResource extends AbstractResource
         return $queryBuilder;
     }
 
-    public function delete(Request $request, $id)
+    public function delete()
     {
         $instance = $this->findInstance($id);
 
@@ -180,7 +181,12 @@ abstract class EloquentResource extends AbstractResource
         return $this->done(null, HttpResponse::HTTP_NO_CONTENT);
     }
 
-    public function instance(Request $request, $id)
+    protected function extractDataFromRequest(Request $request)
+    {
+        return (array) json_decode($request->getContent(), true);
+    }
+
+    public function instance($id)
     {
         $instance = $this->findInstance($id);
 
@@ -193,15 +199,16 @@ abstract class EloquentResource extends AbstractResource
         return $this->done($item);
     }
 
-    public function update(Request $request, $id)
+    public function update($id)
     {
+        $request = $this->getRouter()->getCurrentRequest();
         $instance = $this->findInstance($id);
 
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
-        $data = $request->json()->all();
+        $data = $this->extractDataFromRequest($request);
 
         $closure = function() use ($data, $instance) {
             $this->updateInstance($instance, $data);
