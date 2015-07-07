@@ -1,6 +1,7 @@
 <?php
 namespace Rested\Laravel;
 
+use Illuminate\Routing\RouteCollection;
 use Rested\Definition\Model;
 use Rested\Definition\ResourceDefinition;
 use Rested\FactoryInterface;
@@ -15,10 +16,16 @@ class Factory implements FactoryInterface
 
     private $restedService;
 
+    /**
+     * @var \Illuminate\Routing\RouteCollection
+     */
+    private $routes;
+
     private $urlGenerator;
 
-    public function __construct(UrlGeneratorInterface $urlGenerator, RestedServiceInterface $restedService)
+    public function __construct(RouteCollection $routes, UrlGeneratorInterface $urlGenerator, RestedServiceInterface $restedService)
     {
+        $this->routes = $routes;
         $this->restedService = $restedService;
         $this->urlGenerator = $urlGenerator;
     }
@@ -34,9 +41,26 @@ class Factory implements FactoryInterface
     /**
      * {@inheritdoc}
      */
+    public function createBasicControllerFromRouteName($routeName)
+    {
+        if (($route = $this->routes->getByName($routeName)) === null) {
+            return null;
+        }
+
+        $action = $route->getAction();
+        $controller = $action['controller'];
+
+        list($class, $method) = explode('@', $controller);
+
+        return $this->createBasicController($class);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function createCollectionResponse(RestedResourceInterface $resource, array $items = [], $total = 0)
     {
-        return new CollectionResponse($this->urlGenerator, $resource, $items, $total);
+        return new CollectionResponse($this, $this->urlGenerator, $resource, $items, $total);
     }
 
     /**
@@ -44,7 +68,7 @@ class Factory implements FactoryInterface
      */
     public function createInstanceResponse(RestedResourceInterface $resource, $href, $item)
     {
-        return new InstanceResponse($this->urlGenerator, $resource, $href, $item);
+        return new InstanceResponse($this, $this->urlGenerator, $resource, $href, $item);
     }
 
     /**

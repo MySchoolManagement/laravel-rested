@@ -7,6 +7,7 @@ use Illuminate\Routing\Router;
 use Rested\FactoryInterface;
 use Rested\RestedResource;
 use Rested\Response;
+use Rested\Security\AccessVoter;
 use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -42,20 +43,18 @@ abstract class EloquentResource extends AbstractResource
     public function applyFilters($queryBuilder, $applyLimits = true)
     {
         if ($applyLimits == true) {
-
             $queryBuilder = $queryBuilder
                 ->take($this->getLimit())
                 ->offset($this->getOffset())
             ;
         }
 
-        /*$mapping = $this->getExportMapping();
+        $model = $this->getCurrentModel();
 
-        foreach ($mapping->getFilters() as $filter) {
-            // @todo: security
-            /*if ($app['security']->isGranted($filter->getRequiredPermission()) == false) {
+        foreach ($model->getFilters() as $filter) {
+            if ($this->getAuthorizationChecker()->isGranted(AccessVoter::ATTRIB_FILTER, $filter) === false) {
                 continue;
-            }*//*
+            }
 
             if (($value = $this->getFilter($filter->getName())) !== null) {
                 if ($value == 'null') {
@@ -68,7 +67,7 @@ abstract class EloquentResource extends AbstractResource
                     $queryBuilder->$callable($value);
                 }
             }
-        }*/
+        }
 
         return $queryBuilder;
     }
