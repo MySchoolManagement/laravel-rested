@@ -64,7 +64,7 @@ abstract class EloquentResource extends AbstractResource
                 continue;
             }
 
-            if (($value = $this->getFilter($filter->getName())) !== null) {
+            if (($value = $context->getFilter($filter->getName())) !== null) {
                 if ($value == 'null') {
                     $value = null;
                 }
