@@ -42,6 +42,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
     {
         $this->addPublishedFiles();
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'Rested');
+        $this->registerLateServices();
         $this->registerRoutes();
     }
 
@@ -122,14 +123,19 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
             return new UrlGenerator($app['url']);
         });
 
-        $app->bindShared('Rested\FactoryInterface', function($app) use ($self) {
-            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $self, $app['security.authorization_checker']);
-        });
-        $app->alias('Rested\FactoryInterface', 'rested.factory');
-
         $app->extend('security.voters', function(array $voters) use ($app) {
             return array_merge($voters, [new AccessVoter($app['Symfony\Component\Security\Core\Role\RoleHierarchyInterface'])]);
         });
+    }
+
+    private function registerLateServices()
+    {
+        // this depends on security services which in turn need the session
+        $app = $this->app;
+        $app->bindShared('Rested\FactoryInterface', function($app) {
+            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $this, $app['security.authorization_checker']);
+        });
+        $app->alias('Rested\FactoryInterface', 'rested.factory');
     }
 
     /**
@@ -146,7 +152,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         // add some core resources
         //$this->addResource('Rested\Resources\EntrypointResource');
 
-        $this->processResources();
+        //$x = $this->app['security.authorization_checker'];
+        //$this->processResources();
     }
 
     /**
