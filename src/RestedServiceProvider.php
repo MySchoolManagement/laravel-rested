@@ -123,7 +123,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         });
 
         $app->bindShared('Rested\FactoryInterface', function($app) use ($self) {
-            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $self);
+            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $self, $app['security.authorization_checker']);
         });
         $app->alias('Rested\FactoryInterface', 'rested.factory');
 

@@ -12,9 +12,15 @@ use Rested\RestedResourceInterface;
 use Rested\RestedServiceInterface;
 use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 class Factory implements FactoryInterface
 {
+
+    /**
+     * @var \Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface
+     */
+    private $authorizationChecker;
 
     /**
      * @var RequestContext[]
@@ -30,8 +36,13 @@ class Factory implements FactoryInterface
 
     private $urlGenerator;
 
-    public function __construct(RouteCollection $routes, UrlGeneratorInterface $urlGenerator, RestedServiceInterface $restedService)
+    public function __construct(
+        RouteCollection $routes,
+        UrlGeneratorInterface $urlGenerator,
+        RestedServiceInterface $restedService,
+        AuthorizationCheckerInterface $authorizationChecker)
     {
+        $this->authorizationChecker = $authorizationChecker;
         $this->routes = $routes;
         $this->restedService = $restedService;
         $this->urlGenerator = $urlGenerator;
@@ -42,7 +53,7 @@ class Factory implements FactoryInterface
      */
     public function createBasicController($class)
     {
-        return new $class($this);
+        return new $class($this, $this->urlGenerator, $this->authorizationChecker);
     }
 
     /**
