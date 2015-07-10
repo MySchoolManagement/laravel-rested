@@ -39,10 +39,8 @@ class Factory implements FactoryInterface
     public function __construct(
         RouteCollection $routes,
         UrlGeneratorInterface $urlGenerator,
-        RestedServiceInterface $restedService,
-        AuthorizationCheckerInterface $authorizationChecker)
+        RestedServiceInterface $restedService)
     {
-        $this->authorizationChecker = $authorizationChecker;
         $this->routes = $routes;
         $this->restedService = $restedService;
         $this->urlGenerator = $urlGenerator;
@@ -53,7 +51,7 @@ class Factory implements FactoryInterface
      */
     public function createBasicController($class)
     {
-        return new $class($this, $this->urlGenerator, $this->authorizationChecker);
+        return new $class($this, $this->urlGenerator);
     }
 
     /**

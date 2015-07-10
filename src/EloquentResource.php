@@ -28,7 +28,7 @@ abstract class EloquentResource extends AbstractResource
 
     public function __construct(
         FactoryInterface $factory,
-        UrlGeneratorInterface $urlGenerator = null,
+        UrlGeneratorInterface $urlGenerator,
         AuthorizationCheckerInterface $authorizationChecker = null,
         AuthManager $authManager = null,
         DatabaseManager $databaseManager = null)

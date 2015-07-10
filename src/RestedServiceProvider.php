@@ -133,7 +133,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         // this depends on security services which in turn need the session
         $app = $this->app;
         $app->bindShared('Rested\FactoryInterface', function($app) {
-            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $this, $app['security.authorization_checker']);
+            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $this);
         });
         $app->alias('Rested\FactoryInterface', 'rested.factory');
     }
@@ -153,7 +153,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         //$this->addResource('Rested\Resources\EntrypointResource');
 
         //$x = $this->app['security.authorization_checker'];
-        //$this->processResources();
+        $this->processResources();
     }
 
     /**

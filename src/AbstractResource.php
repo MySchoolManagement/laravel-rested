@@ -21,7 +21,7 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
     private $factory;
 
     public function __construct(FactoryInterface $factory, UrlGeneratorInterface $urlGenerator,
-        AuthorizationCheckerInterface $authorizationChecker, AuthManager $authManager = null)
+        AuthorizationCheckerInterface $authorizationChecker = null, AuthManager $authManager = null)
     {
         $this->authManager = $authManager;
         $this->authorizationChecker = $authorizationChecker;
