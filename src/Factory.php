@@ -7,12 +7,19 @@ use Rested\Definition\ResourceDefinition;
 use Rested\FactoryInterface;
 use Rested\Http\CollectionResponse;
 use Rested\Http\InstanceResponse;
+use Rested\RequestContext;
 use Rested\RestedResourceInterface;
 use Rested\RestedServiceInterface;
 use Rested\UrlGeneratorInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 class Factory implements FactoryInterface
 {
+
+    /**
+     * @var RequestContext[]
+     */
+    private $contexts = [];
 
     private $restedService;
 
@@ -85,5 +92,26 @@ class Factory implements FactoryInterface
     public function createModel(ResourceDefinition $resourceDefinition, $class)
     {
         return new Model($resourceDefinition, $class);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function resolveContextForRequest(Request $request, RestedResourceInterface $resource)
+    {
+        foreach ($this->contexts as $item) {
+            if ($item['request'] === $request) {
+                return $item['context'];
+            }
+        }
+
+        $item = [
+            'context' => new RequestContext($request, $resource),
+            'request' => $request,
+        ];
+
+        $this->contexts[] = $item;
+
+        return $item['context'];
     }
 }

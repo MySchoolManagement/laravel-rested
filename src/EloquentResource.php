@@ -1,8 +1,10 @@
 <?php
 namespace Rested\Laravel;
 
+use Illuminate\Auth\AuthManager;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Routing\Router;
+use Rested\Definition\ActionDefinition;
 use Rested\FactoryInterface;
 use Rested\RestedResource;
 use Rested\Response;
@@ -11,6 +13,7 @@ use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+
 
 /**
  * Provides extra helpers for dealing with endpoints that create content.
@@ -23,11 +26,14 @@ abstract class EloquentResource extends AbstractResource
      */
     protected $databaseManager;
 
-    public function __construct(FactoryInterface $factory, UrlGeneratorInterface $urlGenerator = null,
-        AuthorizationCheckerInterface $authorizationChecker = null, Router $router = null,
+    public function __construct(
+        FactoryInterface $factory,
+        UrlGeneratorInterface $urlGenerator = null,
+        AuthorizationCheckerInterface $authorizationChecker = null,
+        AuthManager $authManager = null,
         DatabaseManager $databaseManager = null)
     {
-        parent::__construct($factory, $urlGenerator, $authorizationChecker, $router);
+        parent::__construct($factory, $urlGenerator, $authorizationChecker, $authManager);
 
         $this->databaseManager = $databaseManager;
     }
@@ -42,10 +48,12 @@ abstract class EloquentResource extends AbstractResource
      */
     public function applyFilters($queryBuilder, $applyLimits = true)
     {
+        $context = $this->getCurrentContext();
+
         if ($applyLimits == true) {
             $queryBuilder = $queryBuilder
-                ->take($this->getLimit())
-                ->offset($this->getOffset())
+                ->take($context->getLimit())
+                ->offset($context->getOffset())
             ;
         }
 
@@ -199,7 +207,7 @@ abstract class EloquentResource extends AbstractResource
         return $this->done($item);
     }
 
-    public function update($id)
+    public function update($id, $callback = null)
     {
         $request = $this->getRouter()->getCurrentRequest();
         $instance = $this->findInstance($id);
@@ -210,9 +218,13 @@ abstract class EloquentResource extends AbstractResource
 
         $data = $this->extractDataFromRequest($request);
 
-        $closure = function() use ($data, $instance) {
+        $closure = function() use ($data, $instance, $callback) {
             $this->updateInstance($instance, $data);
             $this->onUpdated($instance);
+
+            if ($callback !== null) {
+                $callback($instance);
+            }
         };
 
         if ($this->useTransaction() === true) {
@@ -235,7 +247,8 @@ abstract class EloquentResource extends AbstractResource
      */
     protected function findInstance($id)
     {
-        $model = $this->getCurrentModel();
+        // this should always be looked up through the instance model
+        $model = $this->getDefinition()->findAction(ActionDefinition::TYPE_INSTANCE)->getModel();
         $field = $model->getPrimaryKeyField();
 
         if ($field !== null) {

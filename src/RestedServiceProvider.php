@@ -66,6 +66,11 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         return config('rested.prefix');
     }
 
+    public function getResources()
+    {
+        return [];
+    }
+
     private function performLocalRequest(Request $parentRequest = null, $url, $method, $data, &$statusCode = null)
     {
         $urlInfo = parse_url($url);
@@ -122,8 +127,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         });
         $app->alias('Rested\FactoryInterface', 'rested.factory');
 
-        $app->extend('security.voters', function(array $voters) {
-            return array_merge($voters, [new AccessVoter()]);
+        $app->extend('security.voters', function(array $voters) use ($app) {
+            return array_merge($voters, [new AccessVoter($app['Symfony\Component\Security\Core\Role\RoleHierarchyInterface'])]);
         });
     }
 
@@ -179,11 +184,12 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         foreach ($def->getActions() as $action) {
             $href = $action->getUrl();
             $routeName = $action->getRouteName();
-            $callable = sprintf('%s@%s', $class, $action->getCallable());
+            $callable = sprintf('%s@preHandle', $class);
             $route = $router->{$action->getMethod()}($href, [
                 'as' => $routeName,
-                'rested_type' => $action->getType(),
                 'uses' => $callable,
+                '_rested_action' => $action->getType(),
+                '_rested_controller' => $action->getCallable(),
             ]);
 
              // add constraints and validators to the cache
