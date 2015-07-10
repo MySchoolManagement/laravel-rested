@@ -61,6 +61,6 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
         $attributes->set('_rested_controller', $action['_rested_controller']);
         $attributes->set('_rested_action', $action['_rested_action']);
 
-        return $this->handle();
+        return call_user_func_array([$this, 'handle'], func_get_args());
     }
 }
