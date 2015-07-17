@@ -238,6 +238,10 @@ abstract class EloquentResource extends AbstractResource
         $request = $this->getRouter()->getCurrentRequest();
         $instance = $this->findInstance($id);
 
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
 
 
         if ($instance === null) {
