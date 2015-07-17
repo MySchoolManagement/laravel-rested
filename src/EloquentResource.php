@@ -10,6 +10,7 @@ use Rested\RestedResource;
 use Rested\Response;
 use Rested\Security\AccessVoter;
 use Rested\UrlGeneratorInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -31,9 +32,10 @@ abstract class EloquentResource extends AbstractResource
         UrlGeneratorInterface $urlGenerator,
         AuthorizationCheckerInterface $authorizationChecker = null,
         AuthManager $authManager = null,
-        DatabaseManager $databaseManager = null)
+        DatabaseManager $databaseManager = null,
+        RequestStack $requestStack = null)
     {
-        parent::__construct($factory, $urlGenerator, $authorizationChecker, $authManager);
+        parent::__construct($factory, $urlGenerator, $authorizationChecker, $authManager, $requestStack);
 
         $this->databaseManager = $databaseManager;
     }
@@ -236,10 +238,7 @@ abstract class EloquentResource extends AbstractResource
         $request = $this->getRouter()->getCurrentRequest();
         $instance = $this->findInstance($id);
 
-        // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
-            $this->abort(HttpResponse::HTTP_FORBIDDEN);
-        }
+
 
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);

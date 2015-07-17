@@ -12,6 +12,7 @@ use Rested\RestedResourceInterface;
 use Rested\RestedServiceInterface;
 use Rested\UrlGeneratorInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 class Factory implements FactoryInterface
@@ -27,6 +28,14 @@ class Factory implements FactoryInterface
      */
     private $contexts = [];
 
+    /**
+     * @var RequestStack
+     */
+    private $requestStack;
+
+    /**
+     * @var RestedServiceInterface
+     */
     private $restedService;
 
     /**

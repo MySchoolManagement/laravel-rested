@@ -16,10 +16,16 @@ use Rested\RestedResourceInterface;
 use Rested\RestedServiceInterface;
 use Rested\Security\AccessVoter;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 class RestedServiceProvider extends ServiceProvider implements RestedServiceInterface
 {
+
+    /**
+     * @var RequestStack
+     */
+    private $requestStack;
 
     private $resourcesFromServices = [];
 
@@ -40,6 +46,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
      */
     public function boot()
     {
+        $this->requestStack = new RequestStack();
+
         $this->addPublishedFiles();
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'Rested');
         $this->registerLateServices();
@@ -102,6 +110,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $response = $kernel->handle(
             $request = $request, HttpKernelInterface::SUB_REQUEST
         );
+
         $statusCode = $response->getStatusCode();
         $content = $response->getContent();
 
@@ -118,6 +127,11 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $self = $this;
         $app = $this->app;
         $app['rested'] = $app->instance('Rested\RestedServiceInterface', $this);
+
+        $app->bindShared('Symfony\Component\HttpFoundation\RequestStack', function() {
+            return new RequestStack();
+        });
+        $app->alias('Symfony\Component\HttpFoundation\RequestStack', 'request_stack');
 
         $app->bindShared('Rested\UrlGeneratorInterface', function($app) {
             return new UrlGenerator($app['url']);
@@ -197,6 +211,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
                 'uses' => $callable,
                 '_rested_action' => $action->getType(),
                 '_rested_controller' => $action->getCallable(),
+                '_rested_route_name' => $routeName,
             ]);
 
              // add constraints and validators to the cache

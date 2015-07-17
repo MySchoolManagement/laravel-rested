@@ -9,6 +9,7 @@ use Rested\FactoryInterface;
 use Rested\RestedResource;
 use Rested\RestedResourceInterface;
 use Rested\UrlGeneratorInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 abstract class AbstractResource extends Controller implements RestedResourceInterface
@@ -20,13 +21,19 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
 
     private $factory;
 
+    /**
+     * @var RequestStack
+     */
+    private $requestStack;
+
     public function __construct(FactoryInterface $factory, UrlGeneratorInterface $urlGenerator,
-        AuthorizationCheckerInterface $authorizationChecker = null, AuthManager $authManager = null)
+        AuthorizationCheckerInterface $authorizationChecker = null, AuthManager $authManager = null, RequestStack $requestStack = null)
     {
         $this->authManager = $authManager;
         $this->authorizationChecker = $authorizationChecker;
         $this->factory = $factory;
         $this->urlGenerator = $urlGenerator;
+        $this->requestStack = $requestStack;
     }
 
     /**
@@ -34,7 +41,7 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
      */
     public function getCurrentRequest()
     {
-        return $this->getRouter()->getCurrentRequest();
+        return $this->requestStack->getCurrentRequest();
     }
 
     /**
@@ -60,6 +67,7 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
 
         $attributes->set('_rested_controller', $action['_rested_controller']);
         $attributes->set('_rested_action', $action['_rested_action']);
+        $attributes->set('_rested_route_name', $action['_rested_route_name']);
 
         return call_user_func_array([$this, 'handle'], func_get_args());
     }
