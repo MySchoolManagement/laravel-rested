@@ -82,9 +82,9 @@ class Factory implements FactoryInterface
     /**
      * @return InstanceResponse
      */
-    public function createInstanceResponse(RestedResourceInterface $resource, $href, $item)
+    public function createInstanceResponse(RestedResourceInterface $resource, $href, $item, $instance = null)
     {
-        return new InstanceResponse($this, $this->urlGenerator, $resource, $href, $item);
+        return new InstanceResponse($this, $this->urlGenerator, $resource, $href, $item, $instance);
     }
 
     /**

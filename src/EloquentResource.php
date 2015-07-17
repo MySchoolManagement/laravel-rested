@@ -82,6 +82,11 @@ abstract class EloquentResource extends AbstractResource
 
     public function collection()
     {
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance() === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
+
         $items = [];
 
         // build data
@@ -100,6 +105,11 @@ abstract class EloquentResource extends AbstractResource
 
     public function create()
     {
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance() === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
+
         $request = $this->getRouter()->getCurrentRequest();
         $data = $this->extractDataFromRequest($request);
 
@@ -180,6 +190,11 @@ abstract class EloquentResource extends AbstractResource
     {
         $instance = $this->findInstance($id);
 
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
+
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
@@ -202,6 +217,11 @@ abstract class EloquentResource extends AbstractResource
     {
         $instance = $this->findInstance($id);
 
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
+
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
@@ -215,6 +235,11 @@ abstract class EloquentResource extends AbstractResource
     {
         $request = $this->getRouter()->getCurrentRequest();
         $instance = $this->findInstance($id);
+
+        // FIXME: move out in to RestedResource
+        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+            $this->abort(HttpResponse::HTTP_FORBIDDEN);
+        }
 
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);
