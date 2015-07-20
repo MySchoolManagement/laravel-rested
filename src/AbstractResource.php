@@ -17,7 +17,7 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
 
     use RestedResource;
 
-    private $authManager;
+    protected $authManager;
 
     private $factory;
 
@@ -41,11 +41,11 @@ abstract class AbstractResource extends Controller implements RestedResourceInte
      */
     public function getCurrentRequest()
     {
-        return $this->requestStack->getCurrentRequest();
+        return $this->requestStack ? $this->requestStack->getCurrentRequest() : null;
     }
 
     /**
-     * @return Rested\FactoryInterface
+     * @return \Rested\FactoryInterface
      */
     public function getFactory()
     {

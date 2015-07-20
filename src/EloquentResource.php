@@ -1,6 +1,7 @@
 <?php
 namespace Rested\Laravel;
 
+use App\User;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Routing\Router;
@@ -242,7 +243,6 @@ abstract class EloquentResource extends AbstractResource
         if ($this->getCurrentAction()->checkAffordance($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
-
 
         if ($instance === null) {
             $this->abort(HttpResponse::HTTP_NOT_FOUND);

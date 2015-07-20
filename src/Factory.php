@@ -1,6 +1,7 @@
 <?php
 namespace Rested\Laravel;
 
+use Illuminate\Auth\AuthManager;
 use Illuminate\Routing\RouteCollection;
 use Rested\Definition\Model;
 use Rested\Definition\ResourceDefinition;
