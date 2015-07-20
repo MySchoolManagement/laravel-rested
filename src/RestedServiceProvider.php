@@ -67,7 +67,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
             $response = $this->performLocalRequest($parentRequest, $url, $method, $data, $statusCode);
         }
 
-        return Hal::fromJson($response, 1);
+        return Hal::fromJson($response, 2);
     }
 
     public function getPrefix()
