@@ -175,7 +175,8 @@ abstract class EloquentResource extends AbstractResource
 
     protected function createQueryBuilderFor($class, $applyFilters = false, $applyLimits = true)
     {
-        $queryBuilder = new $class();
+        $model = new $class;
+        $queryBuilder = $model->newQuery()->select($model->getTable().'.*');
 
         // apply current locale (not all models handled by this class have i18n enabled)
         /*if (method_exists($queryBuilder, 'joinWithI18n') == true) {
