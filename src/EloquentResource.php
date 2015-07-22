@@ -216,14 +216,14 @@ abstract class EloquentResource extends AbstractResource
             $data = $request->request->all();
         }
 
-        // filter out empty strings
-        return array_filter($data, function($x) {
-            if (is_string($x) === true) {
-                return (mb_strlen($x) > 0);
+        // set empty strings to null
+        return array_map(function($x) {
+            if ((is_string($x) === true) && (mb_strlen($x) === 0)) {
+                return null;
             }
 
-            return true;
-        });
+            return $x;
+        }, $data);
     }
 
     public function instance($id)
