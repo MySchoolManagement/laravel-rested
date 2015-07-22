@@ -211,10 +211,19 @@ abstract class EloquentResource extends AbstractResource
     protected function extractDataFromRequest(Request $request)
     {
         if (in_array($request->getContentType(), ['json', 'application/json']) === true) {
-            return (array) json_decode($request->getContent(), true);
+            $data = (array) json_decode($request->getContent(), true);
         } else {
-            return $request->request->all();
+            $data = $request->request->all();
         }
+
+        // filter out empty strings
+        return array_filter($data, function($x) {
+            if (is_array($x) === false) {
+                return (mb_strlen($x) > 0);
+            }
+
+            return true;
+        });
     }
 
     public function instance($id)
