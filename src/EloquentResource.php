@@ -218,7 +218,7 @@ abstract class EloquentResource extends AbstractResource
 
         // filter out empty strings
         return array_filter($data, function($x) {
-            if (is_array($x) === false) {
+            if (is_string($x) === true) {
                 return (mb_strlen($x) > 0);
             }
 
