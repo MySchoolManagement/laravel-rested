@@ -201,6 +201,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
     {
         $def = $resource->getDefinition();
         $class = get_class($resource);
+        $app = $this->app;
 
         foreach ($def->getActions() as $action) {
             $href = $action->getUrl();
@@ -220,6 +221,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
                      $route->where($token->getName(), Parameter::getValidatorPattern($token->getType()));
                  }
              }
+
+            $app->alias($class, $routeName);
         }
     }
 }

@@ -67,7 +67,7 @@ abstract class EloquentResource extends AbstractResource
                 continue;
             }
 
-            if (($value = $context->getFilter($filter->getName())) !== null) {
+            if (($value = $context->getFilterValue($filter->getName())) !== null) {
                 if ($value == 'null') {
                     $value = null;
                 }
@@ -185,6 +185,15 @@ abstract class EloquentResource extends AbstractResource
 
         if ($applyFilters == true) {
             $queryBuilder = $this->applyFilters($queryBuilder, $applyLimits);
+        }
+
+        $context = $this->getCurrentContext();
+
+        foreach ($this->getCurrentModel()->filterEmbedsForAccess() as $embed) {
+            if ($context->wantsEmbeddable($embed->getName()) === true) {
+                $userData = $embed->getUserData();
+                $queryBuilder->with($userData['rel']);
+            }
         }
 
         return $queryBuilder;
