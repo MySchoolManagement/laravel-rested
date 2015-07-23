@@ -1,16 +1,11 @@
 <?php
 namespace Rested\Laravel;
 
-use App\User;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Database\DatabaseManager;
-use Illuminate\Routing\Router;
 use Rested\Definition\ActionDefinition;
 use Rested\FactoryInterface;
-use Rested\RestedResource;
-use Rested\Response;
-use Rested\Security\AccessVoter;
-use Rested\UrlGeneratorInterface;
+use Rested\RestedServiceInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,14 +24,14 @@ abstract class EloquentResource extends AbstractResource
     protected $databaseManager;
 
     public function __construct(
+        RestedServiceInterface $restedService,
         FactoryInterface $factory,
-        UrlGeneratorInterface $urlGenerator,
-        AuthorizationCheckerInterface $authorizationChecker = null,
-        AuthManager $authManager = null,
-        DatabaseManager $databaseManager = null,
-        RequestStack $requestStack = null)
+        AuthorizationCheckerInterface $authorizationChecker,
+        AuthManager $authManager,
+        DatabaseManager $databaseManager,
+        RequestStack $requestStack)
     {
-        parent::__construct($factory, $urlGenerator, $authorizationChecker, $authManager, $requestStack);
+        parent::__construct($restedService, $factory, $authorizationChecker, $authManager, $requestStack);
 
         $this->databaseManager = $databaseManager;
     }
@@ -52,6 +47,7 @@ abstract class EloquentResource extends AbstractResource
     public function applyFilters($queryBuilder, $applyLimits = true)
     {
         $context = $this->getCurrentContext();
+        $transformMapping = $this->getCurrentAction()->getTransformMapping();
 
         if ($applyLimits == true) {
             $queryBuilder = $queryBuilder
@@ -60,19 +56,13 @@ abstract class EloquentResource extends AbstractResource
             ;
         }
 
-        $model = $this->getCurrentModel();
-
-        foreach ($model->getFilters() as $filter) {
-            if ($this->getAuthorizationChecker()->isGranted(AccessVoter::ATTRIB_FILTER, $filter) === false) {
-                continue;
-            }
-
+        foreach ($transformMapping->getFilters() as $filter) {
             if (($value = $context->getFilterValue($filter->getName())) !== null) {
                 if ($value == 'null') {
                     $value = null;
                 }
 
-                $callable = $filter->getCallable();
+                $callable = $filter->getCallback();
 
                 if ($callable !== null) {
                     $queryBuilder->$callable($value);
@@ -86,7 +76,7 @@ abstract class EloquentResource extends AbstractResource
     public function collection()
     {
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance() === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable() === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -101,30 +91,38 @@ abstract class EloquentResource extends AbstractResource
 
         // build total
         $total = $this->createQueryBuilder(true, false)->count();
-        $item = $this->getFactory()->createCollectionResponse($this, $items, $total);
 
-        return $this->done($item);
+        // create the response
+        $factory = $this->getFactory();
+        $resourceDefinition = $this->getCurrentContext()->getResourceDefinition();
+        $response = $factory->createCollectionResponse(
+            $resourceDefinition,
+            $this->getCurrentAction()->getEndpointUrl(),
+            $items,
+            $total);
+
+        return $this->done($response);
     }
 
     public function create()
     {
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance() === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable() === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
-        $request = $this->getRouter()->getCurrentRequest();
-        $data = $this->extractDataFromRequest($request);
+        $request = $this->getCurrentRequest();
+        $input = $this->extractDataFromRequest($request);
 
         // check for a duplicate record
-        if ($this->hasDuplicate($request, $data) == true) {
-            return $this->abort(HttpResponse::HTTP_CONFLICT, ['An item already exists']);
+        if ($this->hasDuplicate($request, $input) == true) {
+            $this->abort(HttpResponse::HTTP_CONFLICT, ['An item already exists']);
         }
 
         $instance = null;
 
-        $closure = function() use ($data, &$instance) {
-            $instance = $this->createInstance($data);
+        $closure = function() use ($input, &$instance) {
+            $instance = $this->createInstance($input);
 
             if ($instance !== null) {
                 $this->onCreated($instance);
@@ -142,17 +140,13 @@ abstract class EloquentResource extends AbstractResource
         return $this->done($item, HttpResponse::HTTP_CREATED);
     }
 
-
-    /**
-     * Creates a new instance of the type stored in the model.
-     *
-     * @param Form $form
-     *
-     * @return object|null
-     */
-    protected function createInstance(array $data)
+    protected function createInstance(array $input)
     {
-        $instance = $this->getCurrentModel()->apply('en', $data);
+        $action = $this->getCurrentAction();
+        $transform = $action->getTransform();
+        $transformMapping = $action->getTransformMapping();
+
+        $instance = $transform->apply($transformMapping, 'en', $input);
         $instance->save();
 
         return $instance;
@@ -170,18 +164,17 @@ abstract class EloquentResource extends AbstractResource
      */
     protected function createQueryBuilder($applyFilters = false, $applyLimits = true)
     {
-        return $this->createQueryBuilderFor($this->getCurrentModel()->getDefiningClass(), $applyFilters, $applyLimits);
+        return $this->createQueryBuilderFor(
+            $this->getCurrentAction()->getTransformMapping()->getModelClass(),
+            $applyFilters,
+            $applyLimits
+        );
     }
 
-    protected function createQueryBuilderFor($class, $applyFilters = false, $applyLimits = true)
+    protected function createQueryBuilderFor($modelClass, $applyFilters = false, $applyLimits = true)
     {
-        $model = new $class;
+        $model = new $modelClass;
         $queryBuilder = $model->newQuery()->select($model->getTable().'.*');
-
-        // apply current locale (not all models handled by this class have i18n enabled)
-        /*if (method_exists($queryBuilder, 'joinWithI18n') == true) {
-            $queryBuilder->joinWithI18n($this->getRequest()->getLocale());
-        }*/
 
         if ($applyFilters == true) {
             $queryBuilder = $this->applyFilters($queryBuilder, $applyLimits);
@@ -190,12 +183,12 @@ abstract class EloquentResource extends AbstractResource
         return $queryBuilder;
     }
 
-    public function delete()
+    public function delete($id)
     {
         $instance = $this->findInstance($id);
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -208,32 +201,12 @@ abstract class EloquentResource extends AbstractResource
         return $this->done(null, HttpResponse::HTTP_NO_CONTENT);
     }
 
-    protected function extractDataFromRequest(Request $request)
-    {
-        if (in_array($request->getContentType(), ['json', 'application/json']) === true) {
-            $data = (array) json_decode($request->getContent(), true);
-        } else {
-            $data = $request->request->all();
-        }
-
-        // set empty strings to null
-        return array_map(function($x) {
-            $x = preg_replace('/(^\s+)|(\s+$)/us', '', $x);
-
-            if ((is_string($x) === true) && (mb_strlen($x) === 0)) {
-                return null;
-            }
-
-            return $x;
-        }, $data);
-    }
-
     public function instance($id)
     {
         $instance = $this->findInstance($id);
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -248,11 +221,11 @@ abstract class EloquentResource extends AbstractResource
 
     public function update($id, $callback = null)
     {
-        $request = $this->getRouter()->getCurrentRequest();
+        $request = $this->getCurrentRequest();
         $instance = $this->findInstance($id);
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->checkAffordance($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -260,10 +233,10 @@ abstract class EloquentResource extends AbstractResource
             $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
-        $data = $this->extractDataFromRequest($request);
+        $input = $this->extractDataFromRequest($request);
 
-        $closure = function() use ($data, $instance, $callback) {
-            $this->updateInstance($instance, $data);
+        $closure = function() use ($input, $instance, $callback) {
+            $this->updateInstance($instance, $input);
             $this->onUpdated($instance);
 
             if ($callback !== null) {
@@ -292,13 +265,13 @@ abstract class EloquentResource extends AbstractResource
     protected function findInstance($id)
     {
         // this should always be looked up through the instance model
-        $model = $this->getDefinition()->findAction(ActionDefinition::TYPE_INSTANCE)->getModel();
-        $field = $model->getPrimaryKeyField();
+        $action = $this->getCurrentContext()->getResourceDefinition()->findFirstAction(ActionDefinition::TYPE_INSTANCE);
+        $field = $action->getTransformMapping() ->findPrimaryKeyField();
 
         if ($field !== null) {
             return $this
                 ->createQueryBuilder()
-                ->where($field->getGetter(), $id)
+                ->where($field->getCallback(), $id)
                 ->first()
             ;
         }
@@ -310,11 +283,11 @@ abstract class EloquentResource extends AbstractResource
      * With the given data, check to see if an existing item already exists.
      *
      * @param Request $request
-     * @param array $data
+     * @param array $input
      *
      * @return bool
      */
-    protected function hasDuplicate(Request $request, array $data)
+    protected function hasDuplicate(Request $request, array $input)
     {
         return false;
     }
@@ -349,13 +322,17 @@ abstract class EloquentResource extends AbstractResource
      * Updates an existing instance of the content type.
      *
      * @param object $instance
-     * @param array $data
+     * @param array $input
      *
      * @return object|null
      */
-    protected function updateInstance($instance, array $data)
+    protected function updateInstance($instance, array $input)
     {
-        $instance = $this->getCurrentModel()->apply('en', $data, $instance);
+        $action = $this->getCurrentAction();
+        $transform = $action->getTransform();
+        $transformMapping = $action->getTransformMapping();
+
+        $instance = $transform->apply($transformMapping, 'en', $input, $instance);
         $instance->save();
 
         return $instance;

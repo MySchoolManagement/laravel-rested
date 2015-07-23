@@ -3,30 +3,42 @@ namespace Rested\Laravel;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use Nocarrier\Hal;
-use Ramsey\Uuid\Uuid;
+use Rested\Compiler\Compiler;
+use Rested\Compiler\CompilerCache;
+use Rested\Compiler\CompilerCacheInterface;
+use Rested\Compiler\CompilerInterface;
 use Rested\Definition\Parameter;
-use Rested\Helper;
-use Rested\Laravel\Factory;
-use Rested\Laravel\UrlGenerator;
-use Rested\Laravel\Http\Middleware\RoleCheckMiddleware;
+use Rested\Definition\ResourceDefinition;
+use Rested\Http\RequestParser;
+use Rested\Laravel\Http\Middleware\RequestIdMiddleware;
+use Rested\NameGenerator;
+use Rested\ResourceInterface;
 use Rested\RestedResourceInterface;
 use Rested\RestedServiceInterface;
-use Rested\Security\AccessVoter;
+use Rested\Security\RoleVoter;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
+// TODO: refactor RestedServiceInterface into another service
 class RestedServiceProvider extends ServiceProvider implements RestedServiceInterface
 {
 
     /**
-     * @var RequestStack
+     * @var \Rested\RequestContext[]
+     */
+    private $contexts = [];
+
+    /**
+     * @var \Symfony\Component\HttpFoundation\RequestStack
      */
     private $requestStack;
 
+    /**
+     * @var string[]
+     */
     private $resourcesFromServices = [];
 
     /**
@@ -50,6 +62,9 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
 
         $this->addPublishedFiles();
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'Rested');
+
+        $this->app['router']->middleware('request_id', RequestIdMiddleware::class);
+
         $this->registerLateServices();
         $this->registerRoutes();
     }
@@ -68,6 +83,20 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         }
 
         return Hal::fromJson($response, 3);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function findActionByRouteName($routeName)
+    {
+        $resourceDefinition = $this->app['rested.compiler_cache']->findResourceDefinition($routeName);
+
+        if ($resourceDefinition !== null) {
+            return $resourceDefinition->findActionByRouteName($routeName);
+        }
+
+        return null;
     }
 
     public function getPrefix()
@@ -106,10 +135,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         // execute the request
         // TODO: handle errors gracefully
         $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
-
-        $response = $kernel->handle(
-            $request = $request, HttpKernelInterface::SUB_REQUEST
-        );
+        $response = $kernel->handle($request, HttpKernelInterface::SUB_REQUEST);
 
         $statusCode = $response->getStatusCode();
         $content = $response->getContent();
@@ -124,9 +150,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/rested.php', 'rested');
 
-        $self = $this;
         $app = $this->app;
-        $app['rested'] = $app->instance('Rested\RestedServiceInterface', $this);
+        $app->instance('Rested\RestedServiceInterface', $this);
 
         $app->bindShared('Symfony\Component\HttpFoundation\RequestStack', function() {
             return new RequestStack();
@@ -134,23 +159,53 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $app->alias('Symfony\Component\HttpFoundation\RequestStack', 'request_stack');
 
         $app->bindShared('Rested\UrlGeneratorInterface', function($app) {
-            return new UrlGenerator($app['url']);
+            return new UrlGenerator($app['url'], $this->getPrefix());
         });
         $app->alias('Rested\UrlGeneratorInterface', 'rested.url_generator');
 
+        $app->bindShared('Rested\NameGenerator', function() {
+            return new NameGenerator();
+        });
+        $app->alias('Rested\NameGenerator', 'rested.name_generator');
+
+        $app->bindShared('Rested\Compiler\CompilerCacheInterface', function() {
+            return new CompilerCache();
+        });
+        $app->alias('Rested\Compiler\CompilerCacheInterface', 'rested.compiler_cache');
+
         $app->extend('security.voters', function(array $voters) use ($app) {
-            return array_merge($voters, [new AccessVoter($app['Symfony\Component\Security\Core\Role\RoleHierarchyInterface'])]);
+            return array_merge($voters, [
+                new RoleVoter(
+                    $app['Symfony\Component\Security\Core\Role\RoleHierarchyInterface'],
+                    $app['rested.name_generator']
+                )
+            ]);
         });
     }
 
     private function registerLateServices()
     {
-        // this depends on security services which in turn need the session
+        // these depends on security services which in turn need the session
         $app = $this->app;
         $app->bindShared('Rested\FactoryInterface', function($app) {
-            return new Factory($app['routes'], $app['Rested\UrlGeneratorInterface'], $this);
+            return new Factory(
+                $app['routes'],
+                $app['Rested\UrlGeneratorInterface'],
+                $this,
+                $app['rested.name_generator'],
+                $app['rested.compiler_cache']
+            );
         });
         $app->alias('Rested\FactoryInterface', 'rested.factory');
+
+        $app->bindShared('Rested\Compiler\CompilerInterface', function($app) {
+            return new Compiler(
+                $app['rested.factory'],
+                $app['rested.name_generator'],
+                $app['rested.url_generator']
+            );
+        });
+        $app->alias('Rested\Compiler\CompilerInterface', 'rested.compiler');
     }
 
     /**
@@ -164,11 +219,39 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
             return;
         }
 
-        // add some core resources
-        //$this->addResource('Rested\Resources\EntrypointResource');
-
-        //$x = $this->app['security.authorization_checker'];
         $this->processResources();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function resolveContextFromRequest(SymfonyRequest $request, ResourceInterface $resource)
+    {
+        $requestId = $request->headers->get(RequestIdMiddleware::SUB_HEADER);
+
+        if (array_key_exists($requestId, $this->contexts) === true) {
+            return $this->contexts[$requestId];
+        }
+
+        $spec = $request->get('_rested');
+
+        $requestParser = new RequestParser();
+        $requestParser->parse($request->getRequestUri(), $request->query->all());
+
+        $cache = $this->app['rested.compiler_cache'];
+        $cache->setAuthorizationChecker($this->app['security.authorization_checker']);
+
+        $factory = $this->app['rested.factory'];
+        $compiledResourceDefinition = $cache->findResourceDefinition($spec['route_name']);
+
+        $context = $factory->createContext(
+            $requestParser->getParameters(),
+            $spec['action'],
+            $spec['route_name'],
+            $compiledResourceDefinition
+        );
+
+        return ($this->contexts[$requestId] = $context);
     }
 
     /**
@@ -176,9 +259,20 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
      */
     public function provides()
     {
-        return ['rested'];
+        return [
+            'request_stack',
+            'rested',
+            'rested.compiler',
+            'rested.compiler_cache',
+            'rested.factory',
+            'rested.name_generator',
+            'rested.url_generator',
+        ];
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function addResource($class)
     {
         $this->resourcesFromServices[] = $class;
@@ -187,51 +281,55 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
     private function processResources()
     {
         $app = $this->app;
-        $router = $app['router'];
         $resources = array_merge(config('rested.resources'), $this->resourcesFromServices);
-        $prefix = $this->getPrefix();
 
-        $router->group([], function() use ($app, $router, $resources) {
+        $router = $app['router'];
+        $factory = $app['rested.factory'];
+        $compiler = $app['rested.compiler'];
+        $cache = $app['rested.compiler_cache'];
+
+        $attributes = [
+            'middleware' => 'request_id',
+        ];
+
+        $router->group($attributes, function() use ($compiler, $cache, $factory, $router, $resources) {
             foreach ($resources as $class) {
-                $this->addRoutesFromResourceController($router, $app['rested.factory']->createBasicController($class));
+                $this->addRoutesFromResourceDefinition($compiler, $cache, $router, $class::createResourceDefinition($factory), $class);
             }
         });
     }
 
-    private function addRoutesFromResourceController(Router $router, RestedResourceInterface $resource)
+    private function addRoutesFromResourceDefinition(
+        CompilerInterface $compiler,
+        CompilerCacheInterface $cache,
+        Router $router,
+        ResourceDefinition $definition,
+        $resourceClass)
     {
-        $def = $resource->getDefinition();
-        $class = get_class($resource);
+        $compiledDefinition = $compiler->compile($definition);
 
-        foreach ($def->getActions() as $action) {
-            $href = $action->getUrl();
+        foreach ($compiledDefinition->getActions() as $action) {
+            $href = $action->getEndpointUrl(false);
             $routeName = $action->getRouteName();
-            $callable = sprintf('%s@preHandle', $class);
-            $route = $router->{$action->getMethod()}($href, [
+            $controller = sprintf('%s@preHandle', $resourceClass);
+            $route = $router->{$action->getHttpMethod()}($href, [
                 'as' => $routeName,
-                'uses' => $callable,
-                '_rested_action' => $action->getType(),
-                '_rested_controller' => $action->getCallable(),
-                '_rested_route_name' => $routeName,
+                'uses' => $controller,
+                '_rested' => [
+                    'action' => $action->getType(),
+                    'controller' => $action->getControllerName(),
+                    'route_name' => $routeName,
+                ],
             ]);
 
-             // add constraints and validators to the cache
-             foreach ($action->getTokens() as $token) {
-                 if ($token->acceptAnyValue() === false) {
-                     $route->where($token->getName(), Parameter::getValidatorPattern($token->getType()));
-                 }
-             }
+            // add constraints and validators to the cache
+            foreach ($action->getTokens() as $token) {
+                if ($token->acceptAnyValue() === false) {
+                    $route->where($token->getName(), Parameter::getValidatorPattern($token->getDataType()));
+                }
+            }
 
-            $this->app[$routeName] = function($app) use ($class) {
-                return new $class(
-                    $app['rested.factory'],
-                    $app['rested.url_generator'],
-                    $app['security.authorization_checker'],
-                    $app['auth'],
-                    $app['db'],
-                    $app['request_stack']
-                );
-            };
+            $cache->registerResourceDefinition($routeName, $compiledDefinition);
         }
     }
 }

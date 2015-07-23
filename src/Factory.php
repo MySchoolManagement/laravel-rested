@@ -1,38 +1,28 @@
 <?php
 namespace Rested\Laravel;
 
-use Illuminate\Auth\AuthManager;
 use Illuminate\Routing\RouteCollection;
-use Rested\Definition\Model;
+use Rested\Compiler\Compiler;
+use Rested\Compiler\CompilerCache;
+use Rested\Compiler\CompilerCacheInterface;
+use Rested\Definition\Compiled\CompiledResourceDefinitionInterface;
 use Rested\Definition\ResourceDefinition;
+use Rested\Http\Context;
 use Rested\FactoryInterface;
 use Rested\Http\CollectionResponse;
 use Rested\Http\InstanceResponse;
-use Rested\RequestContext;
-use Rested\RestedResourceInterface;
+use Rested\Laravel\Transforms\LaravelTransform;
+use Rested\NameGenerator;
 use Rested\RestedServiceInterface;
-use Rested\UrlGeneratorInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Rested\Transforms\DefaultTransformMapping;
 
 class Factory implements FactoryInterface
 {
 
     /**
-     * @var \Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface
+     * @var \Rested\NameGenerator
      */
-    private $authorizationChecker;
-
-    /**
-     * @var RequestContext[]
-     */
-    private $contexts = [];
-
-    /**
-     * @var RequestStack
-     */
-    private $requestStack;
+    private $nameGenerator;
 
     /**
      * @var RestedServiceInterface
@@ -44,13 +34,20 @@ class Factory implements FactoryInterface
      */
     private $routes;
 
+    /**
+     * @var \Rested\Laravel\UrlGenerator
+     */
     private $urlGenerator;
 
     public function __construct(
         RouteCollection $routes,
-        UrlGeneratorInterface $urlGenerator,
-        RestedServiceInterface $restedService)
+        UrlGenerator $urlGenerator,
+        RestedServiceInterface $restedService,
+        NameGenerator $nameGenerator,
+        CompilerCacheInterface $compilerCache)
     {
+        $this->compilerCache = $compilerCache;
+        $this->nameGenerator = $nameGenerator;
         $this->routes = $routes;
         $this->restedService = $restedService;
         $this->urlGenerator = $urlGenerator;
@@ -59,78 +56,57 @@ class Factory implements FactoryInterface
     /**
      * {@inheritdoc}
      */
-    public function createBasicController($class)
+    public function createCollectionResponse(CompiledResourceDefinitionInterface $resourceDefinition, $href, array $items = [], $total = null)
     {
-        return new $class($this, $this->urlGenerator);
+        return new CollectionResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $href, $items, $total);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createBasicControllerFromRouteName($routeName)
+    public function createContext(array $parameters, $actionType, $routeName, CompiledResourceDefinitionInterface $resourceDefinition)
     {
-        if (($route = $this->routes->getByName($routeName)) === null) {
-            return null;
-        }
-
-        $action = $route->getAction();
-        $controller = $action['controller'];
-
-        list($class, $method) = explode('@', $controller);
-
-        return $this->createBasicController($class);
+        return new Context(
+            $parameters,
+            $actionType,
+            $routeName,
+            $resourceDefinition
+        );
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createCollectionResponse(RestedResourceInterface $resource, array $items = [], $total = 0)
+    public function createResourceDefinition($name, $modelClass)
     {
-        return new CollectionResponse($this, $this->urlGenerator, $resource, $items, $total);
-    }
-
-    /**
-     * @return InstanceResponse
-     */
-    public function createInstanceResponse(RestedResourceInterface $resource, $href, $item, $instance = null)
-    {
-        return new InstanceResponse($this, $this->urlGenerator, $resource, $href, $item, $instance);
+        return new ResourceDefinition($this, $name, $this->createTransform(), $this->createTransformMapping($modelClass));
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createDefinition($name, RestedResourceInterface $resource, $class)
+    public function createTransform()
     {
-        return new ResourceDefinition($name, $resource, $this->restedService, $class);
+        return new LaravelTransform($this, $this->compilerCache, $this->urlGenerator);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createModel(ResourceDefinition $resourceDefinition, $class)
+    public function createTransformMapping($modelClass)
     {
-        return new Model($resourceDefinition, $class);
+        return new DefaultTransformMapping($modelClass);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function resolveContextForRequest(Request $request, RestedResourceInterface $resource)
+    public function createInstanceResponse(
+        CompiledResourceDefinitionInterface $resourceDefinition,
+        $href,
+        array $data,
+        $instance = null)
     {
-        foreach ($this->contexts as $item) {
-            if ($item['request'] === $request) {
-                return $item['context'];
-            }
-        }
-
-        $item = [
-            'context' => new RequestContext($request, $resource),
-            'request' => $request,
-        ];
-
-        $this->contexts[] = $item;
-
-        return $item['context'];
+        return new InstanceResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $href, $data, $instance);
     }
 }
