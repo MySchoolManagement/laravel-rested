@@ -136,6 +136,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $app->bindShared('Rested\UrlGeneratorInterface', function($app) {
             return new UrlGenerator($app['url']);
         });
+        $app->alias('Rested\UrlGeneratorInterface', 'rested.url_generator');
 
         $app->extend('security.voters', function(array $voters) use ($app) {
             return array_merge($voters, [new AccessVoter($app['Symfony\Component\Security\Core\Role\RoleHierarchyInterface'])]);
@@ -220,6 +221,17 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
                      $route->where($token->getName(), Parameter::getValidatorPattern($token->getType()));
                  }
              }
+
+            $this->app[$routeName] = function($app) use ($class) {
+                return new $class(
+                    $app['rested.factory'],
+                    $app['rested.url_generator'],
+                    $app['security.authorization_checker'],
+                    $app['auth'],
+                    $app['db'],
+                    $app['request_stack']
+                );
+            };
         }
     }
 }
