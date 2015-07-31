@@ -3,6 +3,8 @@ namespace Rested\Laravel;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\ServiceProvider;
 use Nocarrier\Hal;
 use Rested\Compiler\Compiler;
@@ -25,6 +27,8 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 // TODO: refactor RestedServiceInterface into another service
 class RestedServiceProvider extends ServiceProvider implements RestedServiceInterface
 {
+
+    const CACHE_FILE = 'rested/cache';
 
     /**
      * @var \Rested\RequestContext[]
@@ -67,6 +71,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
 
         $this->registerLateServices();
         $this->registerRoutes();
+        $this->handleCache();
     }
 
     /**
@@ -168,8 +173,8 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         });
         $app->alias('Rested\NameGenerator', 'rested.name_generator');
 
-        $app->bindShared('Rested\Compiler\CompilerCacheInterface', function() {
-            return new CompilerCache();
+        $app->bindShared('Rested\Compiler\CompilerCacheInterface', function($app) {
+            return new CompilerCache($app['rested.factory'], $app['rested.url_generator']);
         });
         $app->alias('Rested\Compiler\CompilerCacheInterface', 'rested.compiler_cache');
 
@@ -278,7 +283,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $this->resourcesFromServices[] = $class;
     }
 
-    private function processResources()
+    public function processResources(CompilerCacheInterface $cache = null)
     {
         $app = $this->app;
         $resources = array_merge(config('rested.resources'), $this->resourcesFromServices);
@@ -286,7 +291,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $router = $app['router'];
         $factory = $app['rested.factory'];
         $compiler = $app['rested.compiler'];
-        $cache = $app['rested.compiler_cache'];
+        $cache = $cache ?: $app['rested.compiler_cache'];
 
         $attributes = [
             'middleware' => 'request_id',
@@ -330,6 +335,21 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
             }
 
             $cache->registerResourceDefinition($routeName, $compiledDefinition);
+        }
+    }
+
+    private function handleCache()
+    {
+        $path = $this->app->basePath().'/bootstrap/cache/rested.compiler_cache.php';
+        $cache = $this->app['rested.compiler_cache'];
+        $cache->setServices($this->app['rested.factory'], $this->app['rested.url_generator']);
+
+        if ($this->app->routesAreCached() === true) {
+            $data = require $path;
+            $cache->hydrate($data);
+        } else {
+            $data = base64_encode($cache->serialize());
+            file_put_contents($path, '<?php return base64_decode("'.$data.'");');
         }
     }
 }

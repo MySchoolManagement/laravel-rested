@@ -87,7 +87,10 @@ class Factory implements FactoryInterface
      */
     public function createTransform()
     {
-        return new LaravelTransform($this, $this->compilerCache, $this->urlGenerator);
+        $transform = new LaravelTransform();
+        $transform->setServices($this, $this->compilerCache, $this->urlGenerator);
+
+        return $transform;
     }
 
     /**
