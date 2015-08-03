@@ -77,9 +77,9 @@ class Factory implements FactoryInterface
     /**
      * {@inheritdoc}
      */
-    public function createResourceDefinition($name, $modelClass)
+    public function createResourceDefinition($name, $controllerClass, $modelClass)
     {
-        return new ResourceDefinition($this, $name, $this->createTransform(), $this->createTransformMapping($modelClass));
+        return new ResourceDefinition($this, $name, $controllerClass, $this->createTransform(), $this->createTransformMapping($modelClass));
     }
 
     /**
