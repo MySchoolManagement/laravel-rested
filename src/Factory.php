@@ -10,6 +10,7 @@ use Rested\Definition\ResourceDefinition;
 use Rested\Http\Context;
 use Rested\FactoryInterface;
 use Rested\Http\CollectionResponse;
+use Rested\Http\ContextInterface;
 use Rested\Http\InstanceResponse;
 use Rested\Laravel\Transforms\LaravelTransform;
 use Rested\NameGenerator;
@@ -56,9 +57,9 @@ class Factory implements FactoryInterface
     /**
      * {@inheritdoc}
      */
-    public function createCollectionResponse(CompiledResourceDefinitionInterface $resourceDefinition, $href, array $items = [], $total = null)
+    public function createCollectionResponse(CompiledResourceDefinitionInterface $resourceDefinition, ContextInterface $context, $href, array $items = [], $total = null)
     {
-        return new CollectionResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $href, $items, $total);
+        return new CollectionResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $context, $href, $items, $total);
     }
 
     /**
@@ -106,10 +107,11 @@ class Factory implements FactoryInterface
      */
     public function createInstanceResponse(
         CompiledResourceDefinitionInterface $resourceDefinition,
+        ContextInterface $context,
         $href,
         array $data,
         $instance = null)
     {
-        return new InstanceResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $href, $data, $instance);
+        return new InstanceResponse($this->restedService, $this->urlGenerator, $resourceDefinition, $context, $href, $data, $instance);
     }
 }

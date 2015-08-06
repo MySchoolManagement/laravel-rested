@@ -97,6 +97,7 @@ abstract class EloquentResource extends AbstractResource
         $resourceDefinition = $this->getCurrentContext()->getResourceDefinition();
         $response = $factory->createCollectionResponse(
             $resourceDefinition,
+            $this->getCurrentContext(),
             $this->getCurrentAction()->getEndpointUrl(),
             $items,
             $total);

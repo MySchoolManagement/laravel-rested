@@ -139,7 +139,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
 
         // execute the request
         // TODO: handle errors gracefully
-        $kernel = $this->app->make(\Illuminate\Contracts\Http\Kernel::class);
+        $kernel = $GLOBALS['kernel'];//$this->app->make(\Illuminate\Contracts\Http\Kernel::class);
         $response = $kernel->handle($request, HttpKernelInterface::SUB_REQUEST);
 
         $statusCode = $response->getStatusCode();
