@@ -186,15 +186,13 @@ abstract class EloquentResource extends AbstractResource
 
     public function delete($id)
     {
-        $instance = $this->findInstance($id);
+        if (($instance = $this->findInstance($id)) === null) {
+            $this->abort(HttpResponse::HTTP_NOT_FOUND);
+        }
 
         // FIXME: move out in to RestedResource
         if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
-        }
-
-        if ($instance === null) {
-            $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
         $instance->delete();
@@ -204,15 +202,13 @@ abstract class EloquentResource extends AbstractResource
 
     public function instance($id)
     {
-        $instance = $this->findInstance($id);
+        if (($instance = $this->findInstance($id)) === null) {
+            $this->abort(HttpResponse::HTTP_NOT_FOUND);
+        }
 
         // FIXME: move out in to RestedResource
         if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
-        }
-
-        if ($instance === null) {
-            $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
         $item = $this->export($instance);
@@ -223,15 +219,14 @@ abstract class EloquentResource extends AbstractResource
     public function update($id, $callback = null)
     {
         $request = $this->getCurrentRequest();
-        $instance = $this->findInstance($id);
+
+        if (($instance = $this->findInstance($id)) === null) {
+            $this->abort(HttpResponse::HTTP_NOT_FOUND);
+        }
 
         // FIXME: move out in to RestedResource
         if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
-        }
-
-        if ($instance === null) {
-            $this->abort(HttpResponse::HTTP_NOT_FOUND);
         }
 
         $input = $this->extractDataFromRequest($request);
