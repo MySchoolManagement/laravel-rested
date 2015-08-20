@@ -25,7 +25,7 @@ class LaravelTransform extends DefaultTransform
             return $instance->getAttribute($embed->getUserData()['rel']);
         }
 
-        return parent::getEmbedValue($transform, $transformMapping, $instance, $embed);
+        return parent::getEmbedValue($transform, $transformMapping, $embed, $instance);
     }
 
     /**
