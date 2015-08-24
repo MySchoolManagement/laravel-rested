@@ -22,7 +22,11 @@ class LaravelTransform extends DefaultTransform
         $instance)
     {
         if ($this->isEloquentModel($instance) === true) {
-            return $instance->getAttribute($embed->getUserData()['rel']);
+            $userData = $embed->getUserData();
+
+            if (array_key_exists('rel', $userData) === true) {
+                return $instance->getAttribute($embed->getUserData()['rel']);
+            }
         }
 
         return parent::getEmbedValue($transform, $transformMapping, $embed, $instance);
