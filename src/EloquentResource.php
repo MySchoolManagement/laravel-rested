@@ -58,7 +58,7 @@ abstract class EloquentResource extends AbstractResource
 
         foreach ($transformMapping->getFilters() as $filter) {
             if (($value = $context->getFilterValue($filter->getName())) !== null) {
-                if ($value == 'null') {
+                if ($value === 'null') {
                     $value = null;
                 }
 
