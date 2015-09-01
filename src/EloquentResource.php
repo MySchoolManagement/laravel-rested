@@ -90,7 +90,9 @@ abstract class EloquentResource extends AbstractResource
         }
 
         // build total
-        $total = $this->createQueryBuilder(true, false)->count();
+        $builder = $this->createQueryBuilder(true, false);
+        $model = $builder->getModel();
+        $total = $builder->distinct()->count($model->getTable().'.'.$model->getKeyName());
 
         // create the response
         $factory = $this->getFactory();
@@ -175,9 +177,9 @@ abstract class EloquentResource extends AbstractResource
     protected function createQueryBuilderFor($modelClass, $applyFilters = false, $applyLimits = true)
     {
         $model = new $modelClass;
-        $queryBuilder = $model->newQuery()->select($model->getTable().'.*');
+        $queryBuilder = $model->newQuery()->distinct($model->getTable())->select($model->getTable().'.*');
 
-        if ($applyFilters == true) {
+        if ($applyFilters === true) {
             $queryBuilder = $this->applyFilters($queryBuilder, $applyLimits);
         }
 
@@ -265,9 +267,10 @@ abstract class EloquentResource extends AbstractResource
         $field = $action->getTransformMapping() ->findPrimaryKeyField();
 
         if ($field !== null) {
-            return $this
-                ->createQueryBuilder()
-                ->where($field->getCallback(), $id)
+            $queryBuilder = $this->createQueryBuilder();
+
+            return $queryBuilder
+                ->where($queryBuilder->getModel()->getTable().'.'.$field->getCallback(), $id)
                 ->first()
             ;
         }
