@@ -76,7 +76,7 @@ abstract class EloquentResource extends AbstractResource
     public function collection()
     {
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->isAffordanceAvailable() === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($this) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -99,6 +99,7 @@ abstract class EloquentResource extends AbstractResource
         $resourceDefinition = $this->getCurrentContext()->getResourceDefinition();
         $response = $factory->createCollectionResponse(
             $resourceDefinition,
+            $this,
             $this->getCurrentContext(),
             $this->getCurrentAction()->getEndpointUrl(),
             $items,
@@ -110,7 +111,7 @@ abstract class EloquentResource extends AbstractResource
     public function create()
     {
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->isAffordanceAvailable() === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($this) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -193,7 +194,7 @@ abstract class EloquentResource extends AbstractResource
         }
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($this, $instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -209,7 +210,7 @@ abstract class EloquentResource extends AbstractResource
         }
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($this, $instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
@@ -227,7 +228,7 @@ abstract class EloquentResource extends AbstractResource
         }
 
         // FIXME: move out in to RestedResource
-        if ($this->getCurrentAction()->isAffordanceAvailable($instance) === false) {
+        if ($this->getCurrentAction()->isAffordanceAvailable($this, $instance) === false) {
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 

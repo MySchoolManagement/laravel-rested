@@ -64,9 +64,9 @@ abstract class AbstractResource extends Controller implements ResourceInterface
         ;
 
         if ($allFields === true) {
-            return $transform->exportAll($context, $transformMapping, $instance);
+            return $transform->exportAll($context, $this, $transformMapping, $instance);
         } else {
-            return $transform->export($context, $transformMapping, $instance);
+            return $transform->export($context, $this, $transformMapping, $instance);
         }
     }
 
