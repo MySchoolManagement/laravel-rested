@@ -156,6 +156,13 @@ abstract class EloquentResource extends AbstractResource
         return $instance;
     }
 
+    protected function deleteInstance($instance)
+    {
+        $instance->delete();
+
+        return $instance;
+    }
+
     /**
      * Creates a query builder from the bound model class.
      *
@@ -198,7 +205,17 @@ abstract class EloquentResource extends AbstractResource
             $this->abort(HttpResponse::HTTP_FORBIDDEN);
         }
 
-        $instance->delete();
+        $closure = function() use (&$instance) {
+            $instance = $this->deleteInstance($instance);
+
+            $this->onDeleted($instance);
+        };
+
+        if ($this->useTransaction() === true) {
+            $this->databaseManager->transaction($closure);
+        } else {
+            $closure();
+        }
 
         return $this->done(null, HttpResponse::HTTP_NO_CONTENT);
     }
@@ -301,6 +318,16 @@ abstract class EloquentResource extends AbstractResource
      * @param object $instance Instance that was created.
      */
     protected function onCreated($instance)
+    {
+
+    }
+
+    /**
+     * Called when an instance of the content type has been deleted.
+     *
+     * @param object $instance Instance that was deleted.
+     */
+    protected function onDeleted($instance)
     {
 
     }
