@@ -294,7 +294,7 @@ class RestedServiceProvider extends ServiceProvider implements RestedServiceInte
         $cache = $cache ?: $app['rested.compiler_cache'];
 
         $attributes = [
-            'middleware' => 'request_id',
+            'middleware' => ['auth.basic', 'request_id'],
         ];
 
         $router->group($attributes, function() use ($compiler, $cache, $factory, $router, $resources) {
